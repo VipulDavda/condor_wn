@@ -96,7 +96,7 @@ def cmd_option(**options):
             if arg not in ('online','offline','all', 'multicore'):
                 print ("Unknown list option")
                 usage()
-            
+
             choices['list'] = arg
         elif opt in ('-s', '--summary'):
             optionNotAllowed(Options=opts,
@@ -147,7 +147,7 @@ def cmd_option(**options):
                              ShortOption=['-f','-o','t','-s'],
                              LongOption=['--offline','--online','--html','--summary'])
             choices['workernode'] = arg
-        else: 
+        else:
             print "Unknown option"
             usage()
 
@@ -174,9 +174,9 @@ def main(argv):
 
      # header for the output table
     header = ['WorkerNode', 'Status', '#CPUs', '%CPU', '%Memory', 'AverageLoad', 'LoadEfficiency', '#Jobs', 'Jobs']
-    
+
      # get the command line options
-    if argv: 
+    if argv:
          choices = cmd_option(Argv=argv, Header=header)
     else:
          usage()
@@ -260,7 +260,7 @@ def on_off_workernode(**options):
                 print workernode, "is already", status, ", ignoring"
             else:
                 new_wns.append(w)
-        
+
       # change the status of the workernode  
     for w in new_wns:
         workernode = w.split('.')[0]
@@ -275,7 +275,7 @@ def on_off_workernode(**options):
             startjobs = '"StartJobs = False"'
 
         if workernode in workernodes and workernodes[workernode] != status:
-        
+
             cmd = '/usr/bin/condor_config_val -name ' + workernode + ' -startd -set ' + startjobs
             proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
             (out, err) = proc.communicate()
@@ -291,7 +291,7 @@ def on_off_workernode(**options):
                     if out: print out
                     print "ERROR:", err.rstrip()
     return
-    
+
 
 def jobsPerWorkernode(**options):
 
@@ -339,7 +339,7 @@ def jobsPerWorkernode(**options):
             host = result["Name"]
         if result["Machine"] :
             host = result["Machine"]
-       
+
         cluster_host = host
 
         schedd = htcondor.Schedd()
@@ -413,14 +413,14 @@ def jobsPerWorkernode(**options):
                     jobsC[acc_group] += req_cpus + ajob["RemoteUserCpu"]
 
                      # keep track jobs per worker node
-                    if "RemoteHost" in ajob: 
+                    if "RemoteHost" in ajob:
                         remotehost = ajob["RemoteHost"].split('@')[1]
 
                     remotehost = remotehost.split('.')[0]
-                    if not remotehost:
-                        print remotehost
-                        print ajob
-                    
+                    #if not remotehost:
+                    #    print remotehost
+                    #    print ajob
+
                      # number days, hours etc is the job in the queue
                     delta_time = int(time.time() - ajob["JobCurrentStartDate"])
                     delta_time, ndays = d_time(DeltaTime=delta_time)
@@ -499,13 +499,13 @@ def jobsPerWorkernode(**options):
     for k, v in megaI.items():
         line = k + "," + v
         jobsPerVos.append(line)
-    
+
     for k, v in megaH.items():
         line = k + "," + v
         jobsPerVos.append(line)
 
     jobsPerVos = sorted(jobsPerVos)
-    
+
      ### end of jobs per vos
 
      ### total number of jobs running
@@ -520,7 +520,7 @@ def jobsPerWorkernode(**options):
     job_summ['idle'] = idle
 
      ### end of number jobs running
- 
+
      # list of multicore jobs
     if list_type == 'multicore':
         mc_jobs = {}
@@ -568,7 +568,7 @@ def all_wn_info(**options):
     now = datetime.datetime.now()
     html_datetime = now.strftime('%A, %d %B %Y %H:%M:%S')
 
-    html_file     = my_page['html_file'] 
+    html_file     = my_page['html_file']
     html_contents = my_page['pageTemplate']
     headerline    = my_page['headerline'] + cluster_host
     cputitle      = my_page['cputitle']
@@ -580,7 +580,7 @@ def all_wn_info(**options):
     longjobstitle = my_page['longjobstitle']
 
     if userflag:
-        vojobstitle = vojobstitle.replace('VO', 'User') 
+        vojobstitle = vojobstitle.replace('VO', 'User')
 
      # table header
     table = PrettyTable(header)
@@ -605,9 +605,9 @@ def all_wn_info(**options):
            cpuIdle = wn["Cpus"]
            cpuUsed = cpuTotal - cpuIdle
            cpuPer = 100 - ((cpuTotal-cpuUsed)/cpuTotal)*100.0
-           cpuPer = str(float("{0:.1f}".format(cpuPer))) 
-           cpuTotal = int(wn["TotalCpus"]) 
-         
+           cpuPer = str(float("{0:.1f}".format(cpuPer)))
+           cpuTotal = int(wn["TotalCpus"])
+
             # get memory information
            memoryTotal = float(wn["TotalMemory"])
            memoryIdle = float(wn["Memory"])
@@ -620,13 +620,13 @@ def all_wn_info(**options):
 
            jobEff = (_loadAvg/float(cpuTotal))*100
            jobEff = float("{0:.1f}".format(jobEff))
- 
+
            if wn['StartJobs']:
                status = "online"
            else:
                print wn
                status = "offline"
-           
+
            njobs = 0
             # get wn_jobs from the dictionary
            if workernode in wn_jobs:
@@ -646,7 +646,7 @@ def all_wn_info(**options):
            if  list_type == 'multicore':
                if wn_job:
                    table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
- 
+
       # get cpu summary and create pretty table
     cpu_summ = condor_cpu_summ(Collector=collector)
     cpu_summary_table = summary_table(Summary=cpu_summ)
@@ -659,8 +659,7 @@ def all_wn_info(**options):
         jobsPerVos_summ = jobsPerVos_table(Summary=jobsPerVos, User=str(userflag))
     else:
         jobsPerVos_summ = ""
-        vojobstitle = "" 
-        
+        vojobstitle = ""
 
       # create pretty idle jobs table
     idle_jobs_summ = jobs_table(Summary=idle_jobs)
@@ -687,7 +686,7 @@ def all_wn_info(**options):
         html_job_summ, jobtitle = html_table(Table=job_queue_summ, Title=jobtitle)
         html_contents = html_contents.replace('{jobtitle}', jobtitle)
         html_contents = html_contents.replace('{html_job_summ}', html_job_summ)
-        
+
          # jobs per vos table
         html_jobsPerVos, vojobstitle = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
         html_contents = html_contents.replace('{vojobstitle}', vojobstitle)
@@ -732,22 +731,22 @@ def all_wn_info(**options):
 
         if jobsPerVos:
              # number of jobs per vos
-            print vojobstitle 
+            print vojobstitle
             print jobsPerVos_summ
 
          # long jobs 
         if long_jobs:
-            print longjobstitle 
+            print longjobstitle
             print long_jobs_summ
 
          # held jobs 
         if held_jobs:
-            print heldjobstitle 
+            print heldjobstitle
             print held_jobs_summ
 
          # idle jobs 
         if idle_jobs:
-            print idlejobstitle 
+            print idlejobstitle
             print idle_jobs_summ
 
         if list_type != 'summary':
@@ -813,7 +812,7 @@ def workernodes_info(**options):
             print workernode, "not found in this cluster, ignoring"
         else:
             new_wns.append(w)
-        
+
      # get all wn information
     for w in new_wns:
         single_wn = w.split('.')[0]
@@ -833,25 +832,25 @@ def workernodes_info(**options):
                     cpuPer = 100 - ((cpuTotal-cpuUsed)/cpuTotal)*100.0
                     cpuPer = float("{0:.1f}".format(cpuPer))
                     cpuTotal = int(wn["TotalCpus"])
-                  
+
                      # get memory information
                     memoryTotal = float(wn["TotalMemory"])
                     memoryIdle = float(wn["Memory"])
                     memoryUsed = memoryTotal - memoryIdle
                     memoryPer = 100 - ((memoryTotal-memoryUsed)/memoryTotal)*100.0
                     memoryPer = float("{0:.1f}".format(memoryPer))
-     
+
                     _loadAvg = wn['TotalCondorLoadAvg']
                     loadAvg = float("{0:.1f}".format(_loadAvg))
-     
+
                     jobEff = (_loadAvg/float(cpuTotal))*100
                     jobEff = float("{0:.2f}".format(jobEff))
-     
+
                     if wn['StartJobs']:
                         status = "online"
                     else:
                         status = "offline"
-                
+
                     njobs = 0
                      # get wn_jobs from the dictionary
                     if workernode in wn_jobs:
@@ -865,17 +864,17 @@ def workernodes_info(**options):
                     if wn['StartJobs']:
                         wn_data = True
                         table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
-     
+
     # end loop
 
-    if wn_data: 
+    if wn_data:
         headerline = my_page['headerline'] + cluster_host
         now = datetime.datetime.now()
         html_datetime = now.strftime('%A, %d %B %Y %H:%M:%S')
 
         print headerline , html_datetime
         print table
-    return 
+    return
 
 
 def ensure_dir(file_path):
@@ -893,7 +892,7 @@ def summary_table(**options):
     summary = {}
     if options.get('Summary'):
         summary = options.get('Summary')
- 
+
      # table header
     summary_table = PrettyTable(summary.keys())
      # create a border
@@ -904,7 +903,7 @@ def summary_table(**options):
     summary_table.add_row(summary.values())
 
     return summary_table
- 
+
 
 def condor_cpu_summ(**options):
 
@@ -953,7 +952,7 @@ def jobsPerVos_table(**options):
         summary = options.get('Summary')
     if options.get('User'):
         userflag = options.get('User')
- 
+
      # table header
     header = ['VO','Status','CPUs','#Jobs','#Cores','CPU Efficiency' ]
     if userflag == 'True':
@@ -984,7 +983,7 @@ def jobs_table(**options):
     summary = {}
     if options.get('Summary'):
         summary = options.get('Summary')
- 
+
     summary_table = {}
     if len(summary) > 0 :
          # table header
@@ -1036,14 +1035,14 @@ def html_table(**options):
 def d_time(**options):
 
     """ add a leading zero to hr and return number days """
-    
+
     delta_time = ''
     if options.get('DeltaTime'):
         delta_time = options.get('DeltaTime')
 
     delta_time = str(datetime.timedelta(seconds=delta_time))
-    if not 'day' in  delta_time: 
-        delta_time = '0 day, ' + delta_time  
+    if not 'day' in  delta_time:
+        delta_time = '0 day, ' + delta_time
 
     a_time = delta_time.split(',')
     b_time = a_time[1].split(':')
