@@ -1,0 +1,95 @@
+---
+idlejobs_ndays: 1
+heldjobs_ndays: 1
+runningjobs_ndays: 4
+
+html_file: "/var/www/html/condorjobs_overview.html"
+
+headerline:  "Condor Jobs Overview on " 
+cputitle: "CPU Summary"
+vojobstitle: "Jobs per VO"
+jobtitle: "Jobs Summary"
+hostjobstitle: "Jobs per Workernode"
+heldjobstitle: "Held Jobs"
+idlejobstitle: "Idle Jobs"
+longjobstitle: "Long Running Jobs"
+
+pageTemplate: |
+   <!DOCTYPE html>
+   <html>
+   <head>
+     <title>{headerline}</title>
+     <style>
+       body {background-color: white;}
+       p {font-size: 15px; color: blue; margin-top: 0px;}
+       font.table {font-size: 17px; color: blue; margin-top: 0px;}
+       font.header{font-size: 30px; color: grey; margin-top: 0px;}
+       th {padding: 0.25em; background:#dddddddd;}
+       td {font-size: 14px; color: black; margin-top: 0px;}
+     </style>
+   </head>
+   
+   <body onload="setInterval(function() {window.location.reload();}, 60000);">
+   <center>
+     <div style="padding:1px;background-color:#dddddd">
+        <font class="header">{headerline}</font>
+        <p>{html_datetime}</p>
+     </div>
+   </center>
+   
+   <table>
+     <tr>
+       <td>
+         <table>
+           <tr> <td bgcolor="#ffffff"><font class="table">{vojobstitle}</font></td> </tr>
+           <tr> <td bgcolor="#ffffff">{html_jobsPerVos}</td> </tr>
+         </table>
+       </td>
+     <td>
+       <table>
+         <tr>
+           <tr> <td bgcolor="#ffffff"><font class="table">{cputitle}</font></td> </tr>
+           <td bgcolor="#ffffff">{html_cpu_summ}</td>
+         </tr>
+         <tr>
+           <tr> <td bgcolor="#ffffff"><p></p><font class="table">{jobtitle}</font></td> </tr>
+           <td bgcolor="#ffffff">{html_job_summ}</td>
+         </tr>
+       </table>
+     </td>
+   </table>
+   
+   <table>
+        <tr>
+        <td>
+          <table>
+             <tr> <td bgcolor="#ffffff"><font class="table">{idlejobstitle}</font></td> </tr>
+             <tr> <td bgcolor="#ffffff">{html_idlejobs}</td> </tr>
+          </table>
+        </td>
+        <td>
+          <table>
+             <tr> <td bgcolor="#ffffff"><font class="table">{heldjobstitle}</font></td> </tr>
+             <tr> <td bgcolor="#ffffff">{html_heldjobs}</td> </tr>
+          </table>
+        </td>
+        <td>
+          <table>
+             <tr> <td bgcolor="#ffffff"><font class="table">{longjobstitle}</font></td> </tr>
+             <tr> <td bgcolor="#ffffff">{html_longjobs}</td> </tr>
+          </table>
+        </td>
+   </table>
+   <table>
+     <table>
+       <tr>
+         <td bgcolor="#ffffff"><font class="table">{hostjobstitle}</font></td>
+       </tr>
+       <tr>
+         <td bgcolor="#ffffff">{host_table}</td>
+       </tr>
+     </table>
+   </table>
+   
+   </body>
+   </html>

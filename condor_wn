@@ -1,0 +1,1090 @@
+#!/usr/bin/python
+
+import htcondor
+import classad
+import getopt
+import sys
+import os
+import socket
+import subprocess
+import datetime
+from datetime import timedelta
+import socket
+import time
+import yaml
+from prettytable import PrettyTable
+
+### global variables
+condor_wn_yaml = "/usr/local/etc/condor_wn.yaml"
+
+# get the template and header information from condor_wn.yaml file
+with open(condor_wn_yaml, 'r') as stream:
+    try:
+        my_page = yaml.load(stream)
+    except yaml.YAMLError as exc:
+        print(exc)
+
+### end of global variables
+
+def usage():
+
+    """ Usage module """
+
+    script_name = os.path.basename(sys.argv[0])
+    print '%s --list <offline,online,all,multicore>                list worker nodes'% script_name
+    print '%s --list <offline,online,all,multicore> --column n     list worker nodes and sort by nth column' % script_name
+    print '%s --summary                                            print summary tables' % script_name
+    print '%s --workernode <worker nodes name>                     print worker node information'% script_name
+    print '%s --online <worker node names>                         online worker nodes'% script_name
+    print '%s --offline <worker node names>                        offline worker nodes'% script_name
+    print '%s --help                                               prints this help'% script_name
+    sys.exit(0)
+
+
+def optionNotAllowed(**options):
+
+    """ option combination not allowed """
+
+    if options.get('Options'):
+        opts = options.get('Options')
+    if options.get('ShortOption'):
+        short_opts = options.get('ShortOption')
+    if options.get('LongOption'):
+        long_opts = options.get('LongOption')
+
+    for c, v in enumerate(short_opts):
+        if ([item for item in opts if long_opts[c] in item or short_opts[c] in item]):
+            print "Combination of options not allowed"
+            usage()
+
+    return
+
+
+def cmd_option(**options):
+
+    """ command options"""
+
+    ncol=0
+    if options.get('Argv'):
+        argv = options.get('Argv')
+    if options.get('Header'):
+        header = options.get('Header')
+        ncol = len(header)
+
+     # dictionary for options
+    choices = {}
+    choices['sortby'] = 0
+    choices['descending'] = 'False'
+
+    try:
+        opts, args = getopt.getopt(argv, "hl:o:f:dc:w:ts", 
+                                   ['help','list=', 'online=','offline=','descending','column=','workernode=','html','summary'])
+    except getopt.GetoptError as err:
+        print str(err)
+        usage()
+
+    if not opts: usage()
+
+    for opt, arg in opts:
+        if opt in ('-h', '--help'):
+            usage()
+        if opt in ('-l', '--list'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-o','-f','-w','-s'],
+                             LongOption=['--online','--offline','--workernode','--summary'])
+
+            if arg not in ('online','offline','all', 'multicore'):
+                print ("Unknown list option")
+                usage()
+            
+            choices['list'] = arg
+        elif opt in ('-s', '--summary'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-o','-c','-d','-t','-l'],
+                             LongOption=['--online','--column','--descending', '--html','--list'])
+            choices['summary'] = 'summary'
+
+        elif opt in ('-f', '--offline'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-o','-c','-d','-t','-s'],
+                             LongOption=['--online','--column','--descending', '--html','--summary'])
+            choices['offline'] = arg
+
+        elif opt in ('-o', '--online'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-f','-c','-d','-t','-s'],
+                             LongOption=['--offline','--column','--descending', '--html','--summary'])
+            choices['online'] = arg
+
+        elif opt in ('-d', '--descending'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-f','-o','-s'],
+                             LongOption=['--offline','--online','--summary'])
+            choices['descending'] = 'True'
+
+        elif opt in ('-t', '--html'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-f','-o','-w' '-s'],
+                             LongOption=['--offline','--online','--workernode','--summary'])
+            choices['html'] = 'True'
+        elif opt in ('-c', '--column'):
+            sortby = arg
+
+            try:
+                number = int(sortby)
+            except ValueError:
+                print "Invalid column number: value should between 1 and", ncol
+                usage()
+
+            if not number in range(1,ncol+1):
+                print "Invalid column number: value should between 1 and", ncol
+                usage()
+            else:
+                choices['sortby'] = number - 1
+
+        elif opt in ('-w', '--workernode'):
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-f','-o','t','-s'],
+                             LongOption=['--offline','--online','--html','--summary'])
+            choices['workernode'] = arg
+        else: 
+            print "Unknown option"
+            usage()
+
+     # we are not interested in either column or descending option if list or workernode is not specified
+    if all (k in choices for k in ['list','workernode']):
+        try:
+            del choices['column']
+        except KeyError:
+            pass
+        try:
+            del choices['descending']
+        except KeyError:
+            pass
+
+     # if wrong choices made display the help
+    if not choices: usage()
+
+    return choices
+
+
+def main(argv):
+
+    """ main function """
+
+     # header for the output table
+    header = ['WorkerNode', 'Status', '#CPUs', '%CPU', '%Memory', 'AverageLoad', 'LoadEfficiency', '#Jobs', 'Jobs']
+    
+     # get the command line options
+    if argv: 
+         choices = cmd_option(Argv=argv, Header=header)
+    else:
+         usage()
+
+     # get the collector class
+    collector = htcondor.Collector()
+
+    if 'list' in choices:        # list worker node status
+        list_type = choices['list']
+        sortby_col = choices['sortby']
+        descending = choices['descending']
+        html=""
+        if 'html' in choices.keys():
+            html = choices['html']
+        all_wn_info(Collector=collector, Header=header, List_Type=list_type, SortBy_Col=str(sortby_col), Descending=descending, Html=html)
+    elif 'summary' in choices:        # list summary
+        list_type = choices['summary']
+        sortby_col = 0
+        descending = 'False'
+        html=''
+        all_wn_info(Collector=collector, Header=header, List_Type=list_type, SortBy_Col=str(sortby_col), Descending=descending, Html=html)
+    elif 'workernode' in choices:        # only list one workernode
+        workernode = choices['workernode']
+        sortby_col = choices['sortby']
+        descending = choices['descending']
+        workernodes_info(Collector=collector, Header=header, WorkerNode=workernode, SortBy_Col=str(sortby_col), Descending=descending)
+    elif 'online' in choices:            # online a worker node
+        workernode = choices['online']
+        on_off_workernode(Collector=collector, WorkerNode=workernode, Status='online')
+    elif 'offline' in choices:           # offline a worker node
+        workernode = choices['offline']
+        on_off_workernode(Collector=collector, WorkerNode=workernode, Status='offline')
+
+    return
+
+
+def on_off_workernode(**options):
+
+    """ online or offline a list worker nodes """
+
+    if options.get('Collector'):
+        collector = options.get('Collector')
+    if options.get('WorkerNode'):
+        wns = options.get('WorkerNode').split(',')
+    if options.get('Status'):
+        status = options.get('Status')
+
+    startds = collector.query(htcondor.AdTypes.Startd, "PartitionableSlot =?=True")
+    workernodes = {}
+    for wn in startds:
+        if 'Machine' in wn:
+            k = wn['Machine']
+            v = "offline"
+            if wn['StartJobs']: v = "online"
+            workernodes.update({k:v})
+
+    if wns[0] == 'ALL':
+        question = "Are you sure that you want to put ALL workernodes " + status + "?"
+        yesno = query_yes_no(question, default="no")
+        if not yesno:
+            sys.exit(0)
+        else:
+            question = "Are you REALLY sure that you want to put ALL workernodes " + status + "?"
+            yesno = query_yes_no(question, default="no")
+            if not yesno:
+                sys.exit(0)
+
+            wns = list(workernodes.keys())
+
+     # remove wn not found on the cluster
+    new_wns = []
+    for w in wns:
+        workernode = w.split('.')[0]
+        workernode = socket.getfqdn(str(workernode))
+
+        if workernode not in workernodes:
+            print workernode, "not found in this cluster"
+        else:
+             # check  worker nodes status 
+            if workernodes[workernode] == status:
+                print workernode, "is already", status, ", ignoring"
+            else:
+                new_wns.append(w)
+        
+      # change the status of the workernode  
+    for w in new_wns:
+        workernode = w.split('.')[0]
+        workernode = socket.getfqdn(str(workernode))
+
+        startjobs = ""
+        if status == 'online':
+            print "onlining worker node....", workernode
+            startjobs = '"StartJobs = True"'
+        elif status == 'offline':
+            print "offlining worker node....", workernode
+            startjobs = '"StartJobs = False"'
+
+        if workernode in workernodes and workernodes[workernode] != status:
+        
+            cmd = '/usr/bin/condor_config_val -name ' + workernode + ' -startd -set ' + startjobs
+            proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+            (out, err) = proc.communicate()
+            if err:
+                if out: print out
+                print "ERROR:", err.rstrip()
+            else:
+                time.sleep(5)
+                cmd = '/usr/sbin/condor_reconfig -name ' + workernode 
+                proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+                (out, err) = proc.communicate()
+                if err:
+                    if out: print out
+                    print "ERROR:", err.rstrip()
+    return
+    
+
+def jobsPerWorkernode(**options):
+
+    """ fetch all the jobs running on each worker node """
+
+    # Job Status code
+    # 1      Idle
+    # 2      Running
+    # 3      Removed
+    # 4      Completed
+    # 5      Held
+
+    list_type = "False"
+    if options.get('Collector'):
+        collector = options.get('Collector')
+    if options.get('List_Type'):
+        list_type = options.get('List_Type')
+
+     # Ignoreable schedds - any failures when quering these schedds will be ignored
+    ignoreSchedFailures = ['']
+
+     # initilize jobs count
+    running, idle, held, completed, removed = 0, 0, 0, 0, 0
+
+     # for jobs per vos
+    vosa = []
+    jobsW, jobsC = {}, {}
+
+     # condor job summary
+    job_summ = {}
+
+     # worker node : vo:jobsid:req_cpus
+    wn_jobs = {}
+     # held : vo:jobsid:req_cpus:waittime
+    held_jobs = {}
+     # idle : vo:jobsid:req_cpus:waittime
+    idle_jobs = {}
+     # long running jobs
+    long_jobs = {}
+
+    results = collector.query(htcondor.AdTypes.Schedd, "true", [])
+    for result in results:
+        host= ''
+        if result["Name"] :
+            host = result["Name"]
+        if result["Machine"] :
+            host = result["Machine"]
+       
+        cluster_host = host
+
+        schedd = htcondor.Schedd()
+
+        try:
+            ajobs = schedd.query('',[])
+        except:
+            print 'Unable to query schedd:',host,'so will try once more'
+            if host not in ignoreSchedFailures:
+               time.sleep(5)
+               try:
+                  ajobs = schedd.query('',[])
+               except:
+                  print 'Unable to query schedd:', host, 'again'
+                  sys.exit(1)
+            else:
+               print 'Ignoring failure'
+               continue
+
+         # init all the list and dictionary for accounting per vos
+        vos, cpus, agroup = [], [], []
+        jobsR, jobsI, jobsH = {}, {}, {}
+        userflag = False
+
+        for ajob in ajobs:
+
+             # job id
+            jobid = ajob["GlobalJobId"].split('#')[1]
+
+             # job owner
+            jobowner = ''
+            if str(ajob["AccountingGroup"]) != 'Undefined':
+                jobowner = ajob["AccountingGroup"].eval().split('group_')[1] 
+                acc_group = ajob["AccountingGroup"].eval()
+            else:
+                jobowner = ajob["Owner"] 
+                acc_group = jobowner
+                userflag = True
+
+            req_cpus = ajob["RequestCpus"]
+
+            if acc_group not in agroup: agroup.append(acc_group)
+            if acc_group not in vos: vos.append(acc_group)
+            if acc_group not in vosa: vosa.append(acc_group)
+
+            if req_cpus not in cpus: cpus.append(req_cpus)
+
+             # check the status of the jobs and keep count
+            if ajob["JobStatus"] == 1: # idle queue
+                idle += 1
+                if not jobsI.has_key((acc_group, req_cpus)): jobsI[(acc_group, req_cpus)] = 0
+                jobsI[(acc_group, req_cpus)] = jobsI[(acc_group, req_cpus)] + 1
+
+                  # number days, hours etc is the job in the queue for....
+                delta_time = int(time.time() - ajob["QDate"])
+                delta_time, ndays = d_time(DeltaTime=delta_time)
+                idlejobs_ndays = my_page['idlejobs_ndays']
+                if ndays >= idlejobs_ndays:
+                    idle_jobs[jobid] = jobowner + ',' + str(req_cpus) + ',' + delta_time
+
+            elif ajob["JobStatus"] == 2: # run job
+                running += 1
+                if not jobsR.has_key((acc_group, req_cpus)): jobsR[(acc_group, req_cpus)] = 0
+                jobsR[(acc_group, req_cpus)] = jobsR[(acc_group, req_cpus)] + 1
+
+                if "JobCurrentStartDate" in ajob and "RemoteSysCpu" in ajob and "RemoteUserCpu" in ajob:
+                    if not jobsW.has_key(acc_group): jobsW[acc_group] = 0
+                    jobsW[acc_group] += req_cpus*(time.time() - ajob["JobCurrentStartDate"])
+
+                    if not jobsC.has_key(acc_group): jobsC[acc_group] = 0
+                    jobsC[acc_group] += req_cpus + ajob["RemoteUserCpu"]
+
+                     # keep track jobs per worker node
+                    if "RemoteHost" in ajob: 
+                        remotehost = ajob["RemoteHost"].split('@')[1]
+
+                    remotehost = remotehost.split('.')[0]
+                    if not remotehost:
+                        print remotehost
+                        print ajob
+                    
+                     # number days, hours etc is the job in the queue
+                    delta_time = int(time.time() - ajob["JobCurrentStartDate"])
+                    delta_time, ndays = d_time(DeltaTime=delta_time)
+
+                    runningjobs_ndays = my_page['runningjobs_ndays']
+                    if ndays >= runningjobs_ndays:
+                        long_jobs [jobid] = jobowner + ',' + str(req_cpus) + ',' + delta_time
+
+                    separator = ': '
+                    line = jobowner + separator + jobid + separator + str(req_cpus) + separator + delta_time
+
+                    if remotehost not in wn_jobs:
+                        wn_jobs[remotehost] = line
+                    else:
+                        wn_jobs[remotehost] = wn_jobs[remotehost] + ',' + line
+
+            elif ajob["JobStatus"] == 3: # removed job
+                removed += 1
+            elif ajob["JobStatus"] == 4:  # completed job
+                completed += 1
+            elif ajob["JobStatus"] == 5:  # held job
+                held += 1
+                  # number days, hours etc is the job in the queue for ...
+                delta_time = int(time.time() - ajob["JobCurrentStartDate"])
+                delta_time, ndays = d_time(DeltaTime=delta_time)
+
+                heldjobs_ndays = my_page['heldjobs_ndays']
+                if ndays >= heldjobs_ndays:
+                    held_jobs[jobid] = jobowner + ',' + str(req_cpus) + ',' + delta_time
+
+                if not jobsH.has_key((acc_group, req_cpus)): jobsH[(acc_group, req_cpus)] = 0
+                jobsH[(acc_group, req_cpus)] = jobsH[(acc_group, req_cpus)] + 1
+
+     ### jobs per vos
+
+    megaR, megaI, megaH = {}, {}, {}
+
+    for vo in vos:
+        coresR, coresI, coresH = 0, 0, 0
+        for cpu in cpus:
+            if jobsR.has_key((vo, cpu)):
+                status = 'running'
+                ncpus = str(cpu)
+                njobs = str(jobsR[(vo,cpu)])
+                coresR += jobsR[(vo,cpu)] * cpu
+
+                eff = -1.0
+                if (vo in vosa) and (vo in jobsC):
+                    if jobsW[vo] > 0:
+                        eff = jobsC[vo]/jobsW[vo]*100.0
+                        eff = "{0:.2f}".format(round(eff,2)) # round to 2 deimal places
+
+                megaR[vo] = status + "," + ncpus + "," + njobs + "," + str(coresR) + "," + str(eff)
+
+            if jobsI.has_key((vo, cpu)):
+                status = 'idle'
+                ncpus = str(cpu)
+                njobs = str(jobsI[(vo,cpu)])
+                coresI += jobsI[(vo,cpu)] * cpu
+                eff = ""
+                megaI[vo] = status + "," + ncpus + "," + njobs + "," + str(coresI) + "," + eff
+
+            if jobsH.has_key((vo, cpu)):
+                coresH += jobsH[(vo,cpu)] * cpu
+                status = 'held'
+                ncpus = str(cpu)
+                njobs = str(jobsH[(vo,cpu)])
+                eff = ""
+                megaH[vo] = status + "," + ncpus + "," + njobs + "," + str(coresH) + "," + eff
+
+    jobsPerVos = []
+    for k, v in megaR.items():
+        line = k + "," + v
+        jobsPerVos.append(line)
+
+    for k, v in megaI.items():
+        line = k + "," + v
+        jobsPerVos.append(line)
+    
+    for k, v in megaH.items():
+        line = k + "," + v
+        jobsPerVos.append(line)
+
+    jobsPerVos = sorted(jobsPerVos)
+    
+     ### end of jobs per vos
+
+     ### total number of jobs running
+    total = running + idle + held + removed + completed
+
+     # create the dictionary for job summary
+    job_summ['jobs'] = total
+    job_summ['completed'] = completed
+    job_summ['removed'] = removed
+    job_summ['running'] = running
+    job_summ['held'] = held
+    job_summ['idle'] = idle
+
+     ### end of number jobs running
+ 
+     # list of multicore jobs
+    if list_type == 'multicore':
+        mc_jobs = {}
+        for remotehost, jobs in wn_jobs.items():
+            mc = jobs.split(',')
+            for job in mc:
+                cores = int(job.split(':')[2])
+                if cores > 1 :
+                    if remotehost not in mc_jobs:
+                        mc_jobs[remotehost] = job
+                    else:
+                        mc_jobs[remotehost] = mc_jobs[remotehost] + ',' + job
+        return mc_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag
+    else:
+        return wn_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag
+
+
+def all_wn_info(**options):
+
+    """ create pretty output for each worker node """
+
+    html = ""
+    if options.get('Collector'):
+        collector = options.get('Collector')
+    if options.get('Header'):
+        header = options.get('Header')
+    if options.get('List_Type'):
+        list_type = options.get('List_Type')
+    if options.get('SortBy_Col'):
+        sortby_col = int(options.get('SortBy_Col'))
+    if options.get('Descending'):
+        descending = options.get('Descending')
+        if descending == 'True':
+            descending = True
+        else:
+            descending = False
+    if options.get('Html'):
+        html = options.get('Html')
+
+     # get all the jobs per worker node
+    wn_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag  = jobsPerWorkernode(Collector=collector,List_Type=list_type)
+
+     # create the header information
+
+    now = datetime.datetime.now()
+    html_datetime = now.strftime('%A, %d %B %Y %H:%M:%S')
+
+    html_file     = my_page['html_file'] 
+    html_contents = my_page['pageTemplate']
+    headerline    = my_page['headerline'] + cluster_host
+    cputitle      = my_page['cputitle']
+    vojobstitle   = my_page['vojobstitle']
+    jobtitle      = my_page['jobtitle']
+    hostjobstitle = my_page['hostjobstitle']
+    heldjobstitle = my_page['heldjobstitle']
+    idlejobstitle = my_page['idlejobstitle']
+    longjobstitle = my_page['longjobstitle']
+
+    if userflag:
+        vojobstitle = vojobstitle.replace('VO', 'User') 
+
+     # table header
+    table = PrettyTable(header)
+     # create a border
+    table.border = True
+     # border for rows
+    table.hrules = True
+     # sort columns by default it will be column 1
+    table.sortby = header[sortby_col]
+     # ascending or descending column - default is ascending
+    table.reversesort = descending
+     # align the Jobs Col to be left
+    table.align["Jobs"] = "l"
+
+    startds = collector.query(htcondor.AdTypes.Startd, "PartitionableSlot =?=True")
+
+    for wn in startds:
+       if 'Machine' in wn:
+           workernode = wn['Machine'].split('.')[0]
+            # get cpu information
+           cpuTotal = wn["TotalCpus"]
+           cpuIdle = wn["Cpus"]
+           cpuUsed = cpuTotal - cpuIdle
+           cpuPer = 100 - ((cpuTotal-cpuUsed)/cpuTotal)*100.0
+           cpuPer = str(float("{0:.1f}".format(cpuPer))) 
+           cpuTotal = int(wn["TotalCpus"]) 
+         
+            # get memory information
+           memoryTotal = float(wn["TotalMemory"])
+           memoryIdle = float(wn["Memory"])
+           memoryUsed = memoryTotal - memoryIdle
+           memoryPer = 100 - ((memoryTotal-memoryUsed)/memoryTotal)*100.0
+           memoryPer = float("{0:.1f}".format(memoryPer))
+
+           _loadAvg = wn['TotalCondorLoadAvg']
+           loadAvg = float("{0:.1f}".format(_loadAvg))
+
+           jobEff = (_loadAvg/float(cpuTotal))*100
+           jobEff = float("{0:.1f}".format(jobEff))
+ 
+           if wn['StartJobs']:
+               status = "online"
+           else:
+               print wn
+               status = "offline"
+           
+           njobs = 0
+            # get wn_jobs from the dictionary
+           if workernode in wn_jobs:
+               list = wn_jobs[workernode].split(',')
+               list.sort()
+               njobs = len(list)
+               wn_job = '\n'.join(list)
+           else:
+               wn_job =""
+
+           if wn['StartJobs'] and list_type == 'online':
+               table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+           if not wn['StartJobs'] and list_type == 'offline':
+               table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+           if  list_type == 'all':
+               table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+           if  list_type == 'multicore':
+               if wn_job:
+                   table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+ 
+      # get cpu summary and create pretty table
+    cpu_summ = condor_cpu_summ(Collector=collector)
+    cpu_summary_table = summary_table(Summary=cpu_summ)
+
+      # create pretty job summary table
+    job_queue_summ = summary_table(Summary=job_summ)
+
+    if jobsPerVos:
+      # create pretty jobs per vos table
+        jobsPerVos_summ = jobsPerVos_table(Summary=jobsPerVos, User=str(userflag))
+    else:
+        jobsPerVos_summ = ""
+        vojobstitle = "" 
+        
+
+      # create pretty idle jobs table
+    idle_jobs_summ = jobs_table(Summary=idle_jobs)
+
+     # create pretty held jobs table
+    held_jobs_summ = jobs_table(Summary=held_jobs)
+
+     # create pretty long jobs table
+    long_jobs_summ = jobs_table(Summary=long_jobs)
+
+     # print the pretty tables
+    if html:
+
+         # header information
+        html_contents = html_contents.replace('{headerline}', headerline)
+        html_contents = html_contents.replace('{html_datetime}', html_datetime)
+
+         # cpu summary table
+        html_cpu_summ, cputitle = html_table(Table=cpu_summary_table, Title=cputitle)
+        html_contents = html_contents.replace('{cputitle}', cputitle)
+        html_contents = html_contents.replace('{html_cpu_summ}', html_cpu_summ)
+
+         # condor jobs summary table
+        html_job_summ, jobtitle = html_table(Table=job_queue_summ, Title=jobtitle)
+        html_contents = html_contents.replace('{jobtitle}', jobtitle)
+        html_contents = html_contents.replace('{html_job_summ}', html_job_summ)
+        
+         # jobs per vos table
+        html_jobsPerVos, vojobstitle = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
+        html_contents = html_contents.replace('{vojobstitle}', vojobstitle)
+        html_contents = html_contents.replace('{html_jobsPerVos}', html_jobsPerVos)
+
+         # idle jobs table
+        html_idlejobs, idlejobstitle = html_table(Table=idle_jobs_summ, Title=idlejobstitle)
+        html_contents = html_contents.replace('{idlejobstitle}', idlejobstitle)
+        html_contents = html_contents.replace('{html_idlejobs}', html_idlejobs)
+
+         # held jobs table
+        html_heldjobs, heldjobstitle = html_table(Table=held_jobs_summ, Title=heldjobstitle)
+        html_contents = html_contents.replace('{heldjobstitle}', heldjobstitle)
+        html_contents = html_contents.replace('{html_heldjobs}', html_heldjobs)
+
+         # long jobs table
+        html_longjobs, longjobstitle = html_table(Table=long_jobs_summ, Title=longjobstitle)
+        html_contents = html_contents.replace('{longjobstitle}', longjobstitle)
+        html_contents = html_contents.replace('{html_longjobs}', html_longjobs)
+
+         # resource per host table
+        host_table, hostjobstitle = html_table(Table=table, Title=hostjobstitle)
+        html_contents = html_contents.replace('{hostjobstitle}', hostjobstitle)
+        html_contents = html_contents.replace('{host_table}', host_table)
+
+         # create the directory if it does not exist
+        ensure_dir(html_file)
+         # now create the html file
+        with open(html_file, "w") as f:
+            f.write(html_contents)
+        f.close
+    else:
+         # print the header information
+        print headerline , html_datetime
+         # cpu summary
+        print cputitle
+        print cpu_summary_table
+
+         # number of jobs
+        print jobtitle
+        print job_queue_summ
+
+        if jobsPerVos:
+             # number of jobs per vos
+            print vojobstitle 
+            print jobsPerVos_summ
+
+         # long jobs 
+        if long_jobs:
+            print longjobstitle 
+            print long_jobs_summ
+
+         # held jobs 
+        if held_jobs:
+            print heldjobstitle 
+            print held_jobs_summ
+
+         # idle jobs 
+        if idle_jobs:
+            print idlejobstitle 
+            print idle_jobs_summ
+
+        if list_type != 'summary':
+             # jobs per host
+            print hostjobstitle
+            print table
+
+    return
+
+
+def workernodes_info(**options):
+
+    """ create pretty output for a single worker node """
+
+    if options.get('Collector'):
+        collector = options.get('Collector')
+    if options.get('Header'):
+        header = options.get('Header')
+    if options.get('WorkerNode'):
+        wns = options.get('WorkerNode').split(',')
+    if options.get('SortBy_Col'):
+        sortby_col = int(options.get('SortBy_Col'))
+    if options.get('Descending'):
+        descending = options.get('Descending')
+        if descending == 'True':
+            descending = True
+        else:
+            descending = False
+
+     # data flag
+    wn_data = False
+
+     # table header
+    table = PrettyTable(header)
+     # create a border
+    table.border = True
+     # border for rows
+    table.hrules = True
+     # align Jobs col to left
+    table.align["Jobs"] = "l"
+     # sort columns by default it will be column 1
+    table.sortby = header[sortby_col]
+     # ascending or descending column - default is ascending
+    table.reversesort = descending
+
+    startds = collector.query(htcondor.AdTypes.Startd, "PartitionableSlot =?=True")
+
+     # check if htcondor knows about the worker node
+    workernodes = {}
+    for wn in startds:
+       if 'Machine' in wn:
+           k = wn['Machine']
+           v = "offline"
+           if wn['StartJobs']: v = "online"
+           workernodes.update({k:v})
+
+     # remove wn not found on the cluster
+    new_wns = []
+    for w in wns:
+        workernode = w.split('.')[0]
+        workernode = socket.getfqdn(str(workernode))
+        if workernode not in workernodes.keys():
+            print workernode, "not found in this cluster, ignoring"
+        else:
+            new_wns.append(w)
+        
+     # get all wn information
+    for w in new_wns:
+        single_wn = w.split('.')[0]
+
+         # get all the jobs per worker node
+        wn_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag  = jobsPerWorkernode(Collector=collector)
+
+        for wn in startds:
+            if 'Machine' in wn:
+                workernode = wn['Machine'].split('.')[0]
+                if single_wn == workernode:
+
+                     # get cpu information
+                    cpuTotal = wn["TotalCpus"]
+                    cpuIdle = wn["Cpus"]
+                    cpuUsed = cpuTotal - cpuIdle
+                    cpuPer = 100 - ((cpuTotal-cpuUsed)/cpuTotal)*100.0
+                    cpuPer = float("{0:.1f}".format(cpuPer))
+                    cpuTotal = int(wn["TotalCpus"])
+                  
+                     # get memory information
+                    memoryTotal = float(wn["TotalMemory"])
+                    memoryIdle = float(wn["Memory"])
+                    memoryUsed = memoryTotal - memoryIdle
+                    memoryPer = 100 - ((memoryTotal-memoryUsed)/memoryTotal)*100.0
+                    memoryPer = float("{0:.1f}".format(memoryPer))
+     
+                    _loadAvg = wn['TotalCondorLoadAvg']
+                    loadAvg = float("{0:.1f}".format(_loadAvg))
+     
+                    jobEff = (_loadAvg/float(cpuTotal))*100
+                    jobEff = float("{0:.2f}".format(jobEff))
+     
+                    if wn['StartJobs']:
+                        status = "online"
+                    else:
+                        status = "offline"
+                
+                    njobs = 0
+                     # get wn_jobs from the dictionary
+                    if workernode in wn_jobs:
+                        list = wn_jobs[workernode].split(',')
+                        list.sort()
+                        njobs = len(list)
+                        wn_job = '\n'.join(list)
+                    else:
+                        wn_job =""
+
+                    if wn['StartJobs']:
+                        wn_data = True
+                        table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+     
+    # end loop
+
+    if wn_data: 
+        headerline = my_page['headerline'] + cluster_host
+        now = datetime.datetime.now()
+        html_datetime = now.strftime('%A, %d %B %Y %H:%M:%S')
+
+        print headerline , html_datetime
+        print table
+    return 
+
+
+def ensure_dir(file_path):
+    """ create directory if it does not exist """
+
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+def summary_table(**options):
+
+    """ create pretty output for summary table"""
+
+    summary = {}
+    if options.get('Summary'):
+        summary = options.get('Summary')
+ 
+     # table header
+    summary_table = PrettyTable(summary.keys())
+     # create a border
+    summary_table.border = True
+     # border for rows
+    summary_table.hrules = True
+
+    summary_table.add_row(summary.values())
+
+    return summary_table
+ 
+
+def condor_cpu_summ(**options):
+
+    """ create pretty output for cpu sumary """
+
+    if options.get('Collector'):
+        collector = options.get('Collector')
+
+    cpu_summ= {}
+    memoryUsed, memoryFree, cpuUsed, cpuFree, cpusUseable = 0, 0, 0, 0, 0
+
+    results = collector.query(htcondor.AdTypes.Startd, "PartitionableSlot =?=True")
+    for result in results:
+        cpuUsed += result["TotalCpus"] - result["Cpus"]
+        cpuFree += result["Cpus"]
+        cpusUseable += result["TotalCpus"] - result["Cpus"]
+        memoryUsed += result["TotalMemory"] - result["Memory"]
+        memoryFree += result["Memory"]
+
+        if "Machine" in result:
+            if "nubes" in result["Machine"]:
+                cpuUsedCloud += result["TotalCpus"] - result["Cpus"]
+                cpuFreeCloud += result["Cpus"]
+
+    if cpuUsed + cpuFree > 0:
+        cpuUsedPercent = float(cpuUsed)*100/(cpuUsed + cpuFree)
+    else:
+        cpuUsedPercent = 0
+        cpuUseablePercent = 0
+
+    cpu_summ['#CPUs'] = str(int(cpuFree+cpuUsed))
+    cpu_summ['#CPUsUsed'] = str(int(cpuUsed))
+    cpu_summ['#CPUsFree'] = str(int(cpuFree))
+    cpu_summ['%CPUsUsed'] = str(int(cpuUsedPercent))
+
+
+    return cpu_summ
+
+
+def jobsPerVos_table(**options):
+
+    """ create pretty output for summary table jobs per vos"""
+
+    summary = {}
+    if options.get('Summary'):
+        summary = options.get('Summary')
+    if options.get('User'):
+        userflag = options.get('User')
+ 
+     # table header
+    header = ['VO','Status','CPUs','#Jobs','#Cores','CPU Efficiency' ]
+    if userflag == 'True':
+        header[header.index('VO')] = 'User'
+
+    summary_table = PrettyTable(header)
+     # create a border
+    summary_table.border = True
+     # border for rows
+    summary_table.hrules = True
+     # align to right
+    summary_table.align = "r"
+     # align the VO Col to be left
+    summary_table.align["VO"] = "l"
+    summary_table.align["Status"] = "l"
+
+    for l in summary:
+        line = l.split(',')
+        summary_table.add_row(line)
+
+    return summary_table
+
+
+def jobs_table(**options):
+
+    """ create pretty output for summary table for long, idle and held jobs"""
+
+    summary = {}
+    if options.get('Summary'):
+        summary = options.get('Summary')
+ 
+    summary_table = {}
+    if len(summary) > 0 :
+         # table header
+        header = ['JobID','Job Owner', 'CPUs','Time' ]
+        summary_table = PrettyTable(header)
+         # create a border
+        summary_table.border = True
+         # border for rows
+        summary_table.hrules = True
+         # align the VO Col to be left
+        summary_table.align["Job Owner"] = "l"
+         # sorby time
+        summary_table.sortby = header[0]
+        summary_table.reversesort = False
+        summary_table.align["Job Owner"] = "l"
+        summary_table.align["Time"] = "l"
+
+        if summary:
+            for k,v in summary.items():
+                l = str(k) + ',' + v
+                line = l.split(',')
+                summary_table.add_row(line)
+
+    return summary_table
+
+
+def html_table(**options):
+
+    """ create pretty html output for table """
+
+    table = ''
+    title = ''
+    if options.get('Table'):
+        table = options.get('Table')
+    if options.get('Title'):
+        title = options.get('Title')
+
+    # jobs table
+    if table:
+        table.format = True
+        html_table = table.get_html_string()
+    else:
+        html_table = ''
+        title = ''
+
+    return html_table, title
+
+
+def d_time(**options):
+
+    """ add a leading zero to hr and return number days """
+    
+    delta_time = ''
+    if options.get('DeltaTime'):
+        delta_time = options.get('DeltaTime')
+
+    delta_time = str(datetime.timedelta(seconds=delta_time))
+    if not 'day' in  delta_time: 
+        delta_time = '0 day, ' + delta_time  
+
+    a_time = delta_time.split(',')
+    b_time = a_time[1].split(':')
+    hr = b_time[0].strip()
+    hr = "{0:0>2}".format(hr)
+    min = b_time[1].strip()
+    sec = b_time[2].strip()
+    delta_time = a_time[0].strip() + ", " + hr + ":" + min + ":" + sec
+
+    ndays = int(delta_time.split(' ')[0])
+    delta_time = delta_time.replace(',', '')
+
+    return delta_time, ndays
+
+def query_yes_no(question, default="no"):
+    """ yes no module """
+
+    valid = {"yes":True, "y":True, "ye":True, "no":False, "n":False}
+
+    if default == None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = raw_input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' "\
+                             "(or 'y' or 'n').\n")
+
+    return
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
+
