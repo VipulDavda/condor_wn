@@ -779,7 +779,7 @@ def all_wn_info(**options):
 
 def workernodes_info(**options):
 
-    """ create pretty output for a single worker node """
+    """ create pretty output for worker nodes """
 
     if options.get('Collector'):
         collector = options.get('Collector')
@@ -881,9 +881,8 @@ def workernodes_info(**options):
                     else:
                         wn_job =""
 
-                    if wn['StartJobs']:
-                        wn_data = True
-                        table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+                    wn_data = True
+                    table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
     # end loop
 
@@ -898,6 +897,7 @@ def workernodes_info(**options):
 
 
 def ensure_dir(file_path):
+
     """ create directory if it does not exist """
 
     directory = os.path.dirname(file_path)
@@ -958,7 +958,6 @@ def condor_cpu_summ(**options):
     cpu_summ['#CPUsUsed'] = str(int(cpuUsed))
     cpu_summ['#CPUsFree'] = str(int(cpuFree))
     cpu_summ['%CPUsUsed'] = str(int(cpuUsedPercent))
-
 
     return cpu_summ
 
@@ -1077,6 +1076,7 @@ def d_time(**options):
 
     return delta_time, ndays
 
+
 def query_yes_no(question, default="no"):
 
     """ yes no module """
@@ -1103,6 +1103,7 @@ def query_yes_no(question, default="no"):
             sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
 
     return
+
 
 if __name__ == "__main__":
    main(sys.argv[1:])
