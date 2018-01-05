@@ -14,7 +14,7 @@ Dependencies:
            python-prettytable package
            PyYAML package
 Setup:
-          The script should be installed the in /usr/local/bin directory
+          The script should be installed in the directory /usr/local/bin directory
           The condor_wn.yaml file should be located in /usr/local/etc directory
 Usage:
            run /usr/local/bin/condor_wn --help for the options
@@ -645,7 +645,6 @@ def all_wn_info(**options):
            if wn['StartJobs']:
                status = "online"
            else:
-               print wn
                status = "offline"
 
            njobs = 0
