@@ -1,5 +1,29 @@
 #!/usr/bin/python
 
+"""
+Overview:
+          This script is a command line tool to monitor htcondor worker nodes, online/offline worker nodes or
+          print summary information of the running jobs
+          Script can only run as user root.
+
+Tested:   on Python 2.6 ans 2.7
+
+Dependencies:
+           condor-classads package
+           condor-python package
+           python-prettytable package
+           PyYAML package
+Setup:
+          The script should be installed the in /usr/local/bin directory
+          The condor_wn.yaml file should be located in /usr/local/etc directory
+Usage:
+           run /usr/local/bin/condor_wn --help for the options
+
+Version:  0.2
+Author:   Vipul Davda, Department of Particle Physics, Oxford University
+Date  :   19 December 2017
+
+"""
 import htcondor
 import classad
 import getopt
@@ -417,9 +441,6 @@ def jobsPerWorkernode(**options):
                         remotehost = ajob["RemoteHost"].split('@')[1]
 
                     remotehost = remotehost.split('.')[0]
-                    #if not remotehost:
-                    #    print remotehost
-                    #    print ajob
 
                      # number days, hours etc is the job in the queue
                     delta_time = int(time.time() - ajob["JobCurrentStartDate"])
@@ -1058,6 +1079,7 @@ def d_time(**options):
     return delta_time, ndays
 
 def query_yes_no(question, default="no"):
+
     """ yes no module """
 
     valid = {"yes":True, "y":True, "ye":True, "no":False, "n":False}
@@ -1079,8 +1101,7 @@ def query_yes_no(question, default="no"):
         elif choice in valid:
             return valid[choice]
         else:
-            sys.stdout.write("Please respond with 'yes' or 'no' "\
-                             "(or 'y' or 'n').\n")
+            sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
 
     return
 
