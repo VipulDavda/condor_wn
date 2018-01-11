@@ -148,7 +148,7 @@ def cmd_option(**options):
 
         elif opt in ('-t', '--html'):
             optionNotAllowed(Options=opts,
-                             ShortOption=['-f','-o','-w' '-s'],
+                             ShortOption=['-f','-o','-w','-s'],
                              LongOption=['--offline','--online','--workernode','--summary'])
             choices['html'] = 'True'
         elif opt in ('-c', '--column'):
@@ -209,30 +209,59 @@ def main(argv):
     collector = htcondor.Collector()
 
     if 'list' in choices:        # list worker node status
-        list_type = choices['list']
-        sortby_col = choices['sortby']
-        descending = choices['descending']
-        html=""
-        if 'html' in choices.keys():
-            html = choices['html']
-        all_wn_info(Collector=collector, Header=header, List_Type=list_type, SortBy_Col=str(sortby_col), Descending=descending, Html=html)
+
+        if isSchedd(Collector=collector):
+            list_type = choices['list']
+            sortby_col = choices['sortby']
+            descending = choices['descending']
+            html=""
+            if 'html' in choices.keys():
+                html = choices['html']
+            all_wn_info(Collector=collector, Header=header, List_Type=list_type, SortBy_Col=str(sortby_col), Descending=descending, Html=html)
+        else:
+            print "Schedd cannot be contacted"
+            sys.exit(0)
+
     elif 'summary' in choices:        # list summary
-        list_type = choices['summary']
-        sortby_col = 0
-        descending = 'False'
-        html=''
-        all_wn_info(Collector=collector, Header=header, List_Type=list_type, SortBy_Col=str(sortby_col), Descending=descending, Html=html)
+
+        if isSchedd(Collector=collector):
+            list_type = choices['summary']
+            sortby_col = 0
+            descending = 'False'
+            html=''
+            all_wn_info(Collector=collector, Header=header, List_Type=list_type, SortBy_Col=str(sortby_col), Descending=descending, Html=html)
+        else:
+            print "Schedd cannot be contacted"
+            sys.exit(0)
+
     elif 'workernode' in choices:        # only list one workernode
-        workernode = choices['workernode']
-        sortby_col = choices['sortby']
-        descending = choices['descending']
-        workernodes_info(Collector=collector, Header=header, WorkerNode=workernode, SortBy_Col=str(sortby_col), Descending=descending)
+
+        if isSchedd(Collector=collector):
+            workernode = choices['workernode']
+            sortby_col = choices['sortby']
+            descending = choices['descending']
+            workernodes_info(Collector=collector, Header=header, WorkerNode=workernode, SortBy_Col=str(sortby_col), Descending=descending)
+        else:
+            print "Schedd cannot be contacted"
+            sys.exit(0)
+
     elif 'online' in choices:            # online a worker node
-        workernode = choices['online']
-        on_off_workernode(Collector=collector, WorkerNode=workernode, Status='online')
+
+        if isCollector(Collector=collector):
+            workernode = choices['online']
+            on_off_workernode(Collector=collector, WorkerNode=workernode, Status='online')
+        else:
+            print "Collector Deamon not running on this host"
+            sys.exit(0)
+
     elif 'offline' in choices:           # offline a worker node
-        workernode = choices['offline']
-        on_off_workernode(Collector=collector, WorkerNode=workernode, Status='offline')
+
+        if isCollector(Collector=collector):
+            workernode = choices['offline']
+            on_off_workernode(Collector=collector, WorkerNode=workernode, Status='offline')
+        else:
+            print "Collector Deamon not running on this host"
+            sys.exit(0)
 
     return
 
@@ -697,40 +726,42 @@ def all_wn_info(**options):
         html_contents = html_contents.replace('{headerline}', headerline)
         html_contents = html_contents.replace('{html_datetime}', html_datetime)
 
-         # cpu summary table
-        html_cpu_summ, cputitle = html_table(Table=cpu_summary_table, Title=cputitle)
-        html_contents = html_contents.replace('{cputitle}', cputitle)
-        html_contents = html_contents.replace('{html_cpu_summ}', html_cpu_summ)
+        if list_type == 'all' or list_type == 'summary':
+             # cpu summary table
+            html_cpu_summ, cputitle = html_table(Table=cpu_summary_table, Title=cputitle)
+            html_contents = html_contents.replace('{cputitle}', cputitle)
+            html_contents = html_contents.replace('{html_cpu_summ}', html_cpu_summ)
+    
+             # condor jobs summary table
+            html_job_summ, jobtitle = html_table(Table=job_queue_summ, Title=jobtitle)
+            html_contents = html_contents.replace('{jobtitle}', jobtitle)
+            html_contents = html_contents.replace('{html_job_summ}', html_job_summ)
+    
+             # jobs per vos table
+            html_jobsPerVos, vojobstitle = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
+            html_contents = html_contents.replace('{vojobstitle}', vojobstitle)
+            html_contents = html_contents.replace('{html_jobsPerVos}', html_jobsPerVos)
+    
+             # idle jobs table
+            html_idlejobs, idlejobstitle = html_table(Table=idle_jobs_summ, Title=idlejobstitle)
+            html_contents = html_contents.replace('{idlejobstitle}', idlejobstitle)
+            html_contents = html_contents.replace('{html_idlejobs}', html_idlejobs)
+    
+             # held jobs table
+            html_heldjobs, heldjobstitle = html_table(Table=held_jobs_summ, Title=heldjobstitle)
+            html_contents = html_contents.replace('{heldjobstitle}', heldjobstitle)
+            html_contents = html_contents.replace('{html_heldjobs}', html_heldjobs)
+    
+             # long jobs table
+            html_longjobs, longjobstitle = html_table(Table=long_jobs_summ, Title=longjobstitle)
+            html_contents = html_contents.replace('{longjobstitle}', longjobstitle)
+            html_contents = html_contents.replace('{html_longjobs}', html_longjobs)
 
-         # condor jobs summary table
-        html_job_summ, jobtitle = html_table(Table=job_queue_summ, Title=jobtitle)
-        html_contents = html_contents.replace('{jobtitle}', jobtitle)
-        html_contents = html_contents.replace('{html_job_summ}', html_job_summ)
-
-         # jobs per vos table
-        html_jobsPerVos, vojobstitle = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
-        html_contents = html_contents.replace('{vojobstitle}', vojobstitle)
-        html_contents = html_contents.replace('{html_jobsPerVos}', html_jobsPerVos)
-
-         # idle jobs table
-        html_idlejobs, idlejobstitle = html_table(Table=idle_jobs_summ, Title=idlejobstitle)
-        html_contents = html_contents.replace('{idlejobstitle}', idlejobstitle)
-        html_contents = html_contents.replace('{html_idlejobs}', html_idlejobs)
-
-         # held jobs table
-        html_heldjobs, heldjobstitle = html_table(Table=held_jobs_summ, Title=heldjobstitle)
-        html_contents = html_contents.replace('{heldjobstitle}', heldjobstitle)
-        html_contents = html_contents.replace('{html_heldjobs}', html_heldjobs)
-
-         # long jobs table
-        html_longjobs, longjobstitle = html_table(Table=long_jobs_summ, Title=longjobstitle)
-        html_contents = html_contents.replace('{longjobstitle}', longjobstitle)
-        html_contents = html_contents.replace('{html_longjobs}', html_longjobs)
-
-         # resource per host table
-        host_table, hostjobstitle = html_table(Table=table, Title=hostjobstitle)
-        html_contents = html_contents.replace('{hostjobstitle}', hostjobstitle)
-        html_contents = html_contents.replace('{host_table}', host_table)
+        if list_type != 'summary':
+             # resource per host table
+            host_table, hostjobstitle = html_table(Table=table, Title=hostjobstitle)
+            html_contents = html_contents.replace('{hostjobstitle}', hostjobstitle)
+            html_contents = html_contents.replace('{host_table}', host_table)
 
          # create the directory if it does not exist
         ensure_dir(html_file)
@@ -741,33 +772,34 @@ def all_wn_info(**options):
     else:
          # print the header information
         print headerline , html_datetime
-         # cpu summary
-        print cputitle
-        print cpu_summary_table
-
-         # number of jobs
-        print jobtitle
-        print job_queue_summ
-
-        if jobsPerVos:
-             # number of jobs per vos
-            print vojobstitle
-            print jobsPerVos_summ
-
-         # long jobs 
-        if long_jobs:
-            print longjobstitle
-            print long_jobs_summ
-
-         # held jobs 
-        if held_jobs:
-            print heldjobstitle
-            print held_jobs_summ
-
-         # idle jobs 
-        if idle_jobs:
-            print idlejobstitle
-            print idle_jobs_summ
+        if list_type == 'all' or list_type == 'summary':
+             # cpu summary
+            print cputitle
+            print cpu_summary_table
+    
+             # number of jobs
+            print jobtitle
+            print job_queue_summ
+    
+            if jobsPerVos:
+                 # number of jobs per vos
+                print vojobstitle
+                print jobsPerVos_summ
+    
+             # long jobs 
+            if long_jobs:
+                print longjobstitle
+                print long_jobs_summ
+    
+             # held jobs 
+            if held_jobs:
+                print heldjobstitle
+                print held_jobs_summ
+    
+             # idle jobs 
+            if idle_jobs:
+                print idlejobstitle
+                print idle_jobs_summ
 
         if list_type != 'summary':
              # jobs per host
@@ -1105,6 +1137,39 @@ def query_yes_no(question, default="no"):
     return
 
 
+def isCollector(**options):
+
+    """ is the collector demon runnig on the host """
+    if options.get('Collector'):
+        collector = options.get('Collector')
+
+    try:
+        col = collector.locate(htcondor.DaemonTypes.Collector)
+        if 'Machine' in col:
+            collector_hostname = col['Machine']
+            hostname = socket.gethostname()
+            if collector_hostname == hostname:
+                return True
+            else:
+                return False
+    except:
+        return False
+
+
+def isSchedd(**options):
+
+    """ check if schedd is defined """
+
+    if options.get('Collector'):
+        collector = options.get('Collector')
+
+    try:
+        s = collector.locate(htcondor.DaemonTypes.Schedd) # Locate the default collector
+        return True
+    except:
+        return False
+
+
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])
 
