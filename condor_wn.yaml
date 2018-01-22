@@ -1,7 +1,9 @@
 ---
-idlejobs_ndays: 1
-heldjobs_ndays: 1
-runningjobs_ndays: 4
+idlejobs_ndays: 2
+heldjobs_ndays: 2
+runningjobs_ndays: 5
+inefficient_cpu_threshold: 120
+inefficient_cpu_time_threshold: 3600
 
 html_file: "/var/www/html/condorjobs_overview.html"
 
@@ -13,6 +15,7 @@ hostjobstitle: "Jobs per Workernode"
 heldjobstitle: "Held Jobs"
 idlejobstitle: "Idle Jobs"
 longjobstitle: "Long Running Jobs"
+ineffjobstitle: "Jobs Exceeding CPU Threshold"
 
 pageTemplate: |
    <!DOCTYPE html>
@@ -79,6 +82,16 @@ pageTemplate: |
              <tr> <td bgcolor="#ffffff">{html_longjobs}</td> </tr>
           </table>
         </td>
+   </table>
+   <table>
+     <table>
+       <tr>
+         <td bgcolor="#ffffff"><font class="table">{ineffjobstitle}</font></td>
+       </tr>
+       <tr>
+         <td bgcolor="#ffffff">{html_ineffjobs}</td>
+       </tr>
+     </table>
    </table>
    <table>
      <table>
