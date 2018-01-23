@@ -1,5 +1,5 @@
 Name
-       condor_wn  A command line tool to gathers information about the HTcondor 
+       condor_wn  is a command line tool to gathers information about the HTcondor 
                   jobs on a cluster and displays it in a pretty format.
 Synopsis
        condor_wn  [ --list <all:offline:online:multicore> ] [ --column n ] [ --descending ]
@@ -12,11 +12,11 @@ Synopsis
                   [ --help ]
 
 Description
-       condor_wn is a Linux-only tool that displays the snapshot information about jobs running 
+       condor_wn is a Linux-only tool that displays a snapshot information about jobs running 
        on the HTcondor cluster. The condor_wn tool is written in python using the client-side 
        APIs for HTCondor and the ClassAd language.
 
-       Display table descritions:
+       Display table description:
 
        Summary Tables:
            Jobs per User table columns: User, Status, Requested CPUs, Total Number of Jobs, 
@@ -36,7 +36,7 @@ Description
 
        Jobs per Worker node table column: Name, Status, Number of CPUS, %CPU used, %Memory used, Average Load, 
                                           Load Efficiency, Number of Jobs, Jobs Details
-            Jobs Column: User: JobId, Number Requested CPUs, Running Time, Job Efficiency
+            Jobs Column: User, JobId, Number Requested CPUs, Running Time, Job Efficiency
            
        html option created an html file of the above tables
 
@@ -76,7 +76,7 @@ Options
             offline worker node. Comma separated list can be used to offline worker nodes.
 
        --html 
-            create an html file of the display tables
+            create an html file of the tables
 
        --help
             display simple help
@@ -85,7 +85,7 @@ Additional Files
        condor_wn.yaml  Configuration files with settings and html output template.
 
 Exit Status
-       condor_wn will exit with a status value of 0 (zero) upon  success.
+       condor_wn will exit with a status value of 0 (zero) upon success.
 
 Dependencies
        The following rpms has to be installed to use condor_wn tool:

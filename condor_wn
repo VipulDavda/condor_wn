@@ -952,12 +952,11 @@ def cpusummary_table(**options):
         summary_table.hrules = True
 
         if summary:
-            for k,v in summary.items():
-                if k == "#WNs": wn = v
-                if k == "#CPUs": ncpus = v
-                if k == "#CPUsUsed": used_ncpus = v
-                if k == "#CPUsFree": free_ncpus = v
-                if k == "%CPUsUsed": per_cpus = v
+            wn = summary["#WNs"]
+            ncpus = summary["#CPUs"]
+            used_ncpus = summary["#CPUsUsed"]
+            free_ncpus = summary["#CPUsFree"]
+            per_cpus = summary["%CPUsUsed"]
             summary_table.add_row([wn, ncpus, used_ncpus, free_ncpus, per_cpus])
     return summary_table
 
