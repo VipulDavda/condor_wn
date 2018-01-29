@@ -1,29 +1,125 @@
 #!/usr/bin/python
 
 """
-Overview:
-          This script is a command line tool to monitor htcondor worker nodes, online/offline worker nodes or
-          print summary information of the running jobs
-          Script can only run as user root.
+Name
+       condor_wn is a command line tool to gathers information about the HTcondor
+       jobs on a cluster and displays it in a pretty format.
 
-Tested:   on Python 2.6 ans 2.7
+Tested
+       Python 2.6 and 2.7
 
-Dependencies:
-           condor-classads package
-           condor-python package
-           python-prettytable package
-           PyYAML package
-Setup:
-          The script should be installed in the directory /usr/local/bin directory
-          The condor_wn.yaml file should be located in /usr/local/etc directory
-Usage:
-           run /usr/local/bin/condor_wn --help for the options
+Setup
+       The script should be installed in the directory /usr/local/bin directory
+       The condor_wn.yaml file should be located in the /usr/local/etc directory
 
-Version:  0.2
-Author:   Vipul Davda, Department of Particle Physics, Oxford University
-Date  :   19 December 2017
+Synopsis
+       condor_wn  [ --list <all:offline:online:multicore> ] [ --column n ] [ --descending ]
+                  [ --summary ]
+                  [ --workernode <workernode> ]
+                  [ --user <username> ]
+                  [ --online <workernode> ]
+                  [ --offline <workernode> ]
+                  [ --html ]
+                  [ --help ]
+
+Description
+       condor_wn is a Linux-only tool that displays a snapshot information about jobs running
+       on the HTcondor cluster. The condor_wn tool is written in python using the client-side
+       APIs for HTCondor and the ClassAd language.
+
+       Display table description:
+
+       Summary Tables:
+           Jobs per User table columns:      User, Status, Requested CPUs, Total Number of Jobs,
+                                             Number of Cores and CPU Efficiency
+
+           CPU Summary table columns:        Total Number of Worker Nodes, Total Number of CPUs,
+                                             Number of CPUs used, Number of CPUs free, Percentage of CPUs used.
+
+           Jobs Summary table columns:       Total Number of jobs, Total completed, Total in held, Total in idle
+                                             Total in held, Total in running, Total in removed queues
+
+           Held jobs table columns:          Condor Job ID, Job Owner, CPU requested, Job running time
+
+           Idle jobs table columns:          Condor Job ID, Job Owner, CPU requested, Job running time
+
+           Long running jobs table columns:  Condor Job ID, Job Owner, CPU requested, Job running time
+
+           Jobs Exceeding CPU table columns: Worker node, Condor Job ID, Job Owner, CPU requested, CPU Efficiency,
+                                             Job running time
+
+       Jobs per Worker node table column:    Name, Status, Number of CPUS, %CPU used, %Memory used, Average Load,
+                                             Load Efficiency, Number of Jobs, Jobs Details
+
+            Jobs Column: User, JobId, Number Requested CPUs, Running Time, Job Efficiency
+
+       html option creates an html file of the above tables
+
+       If multiple worker nodes has to be onlined or offlined, a comma separated list can be used.
+       "ALL" input with either --online or --offline option can be used to onlined/offlined all worker nodes.
+
+Options
+       --list <all:offline:online:multicore>  {same as -l}
+            all:       displays all jobs running on worker nodes
+            online:    displays only jobs running on online worker nodes
+            offline:   displays only jobs running on offline worker nodes
+            multicore: displays only jobs running the more than 1 CPUs on worker nodes
+
+       --column n {same as -c}
+            sort the table by column number.
+
+       --descending {same as -d}
+            sort the column by descending order.
+
+       --summary {same as -s}
+            displays summary tables: Jobs per User, CPU Summary, Jobs Summary
+            Additional tables: Held jobs, Idle jobs, Long running jobs and Exceeding CPU
+                               threshold jobs if criteria specified in the condor_wn.yaml
+                               file is met.
+
+       --workernode <workernode> {same as -w}
+            display all jobs running on the worker node. Comma separated list can be used
+            to display multiple worker nodes.
+
+       --user <username> {same as -u}
+            display all jobs owned by a user running on the worker nodes.
+
+       --online <workernode> {same as -o}
+            online worker node. Comma separated list can be used to online worker nodes.
+
+       --offline <workernode> {same as -f}
+            offline worker node. Comma separated list can be used to offline worker nodes.
+
+       --html {same as -t}
+            create an html file of the tables
+
+       --help {same as -h}
+            display simple help
+
+Additional Files
+       condor_wn.yaml  Configuration files contains initial settings and html output template.
+
+Exit Status
+       condor_wn will exit with a status value of 0 (zero) upon success.
+
+Dependencies
+       The following rpms has to be installed to use condor_wn tool:
+              condor-classads
+              condor-python
+              python-prettytable
+              PyYAML
+
+Version
+       0.21  - 22nd January 2018
+
+Author
+       Vipul Davda, Department of Particle Physics, University of Oxford
+
+Copyright
+       Rights Reserved. Licensed under the Apache License, Version 2.0.
 
 """
+
 import htcondor
 import classad
 import getopt
@@ -102,8 +198,8 @@ def cmd_option(**options):
     choices['descending'] = False
 
     try:
-        opts, args = getopt.getopt(argv, "hl:o:f:dc:w:tsu:q:n:", 
-                                   ['help','list=', 'online=','offline=','descending','column=','workernode=','html','summary','user=','queue=','number'])
+        opts, args = getopt.getopt(argv, "hl:o:f:dc:w:tsu:q:n:",
+                     ['help','list=', 'online=','offline=','descending','column=','workernode=','html','summary','user=','queue=','number'])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -169,8 +265,8 @@ def cmd_option(**options):
                 choices['sortby'] = number - 1
 
         elif opt in ('-w', '--workernode'):
-            optionNotAllowed(Options=opts, 
-                             ShortOption=['-f','-o'], 
+            optionNotAllowed(Options=opts,
+                             ShortOption=['-f','-o'],
                              LongOption=['--offline','--online'])
             choices['workernode'] = arg
 
@@ -304,7 +400,7 @@ def on_off_workernode(**options):
                 print "ERROR:", err.rstrip()
             else:
                 time.sleep(5)
-                cmd = '/usr/sbin/condor_reconfig -name ' + workernode 
+                cmd = '/usr/sbin/condor_reconfig -name ' + workernode
                 proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
                 (out, err) = proc.communicate()
                 if err:
@@ -403,10 +499,10 @@ def jobsPerWorkernode(**options):
              # job owner
             jobowner = ''
             if str(ajob["AccountingGroup"]) != 'Undefined':
-                jobowner = ajob["AccountingGroup"].eval().split('group_')[1] 
+                jobowner = ajob["AccountingGroup"].eval().split('group_')[1]
                 acc_group = ajob["AccountingGroup"].eval()
             else:
-                jobowner = ajob["Owner"] 
+                jobowner = ajob["Owner"]
                 acc_group = jobowner
                 userflag = True
 
@@ -580,10 +676,16 @@ def jobsPerWorkernode(**options):
                         mc_jobs[remotehost] = job
                     else:
                         mc_jobs[remotehost] = mc_jobs[remotehost] + ',' + job
-        return mc_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag
+
+        return {'jobs':mc_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
+                'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
+                'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
     else:
-        if user == 'all': 
-            return wn_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag, ineff_jobs
+        if user == 'all':
+
+            return {'jobs':wn_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
+                    'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
+                    'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
         else:
             user_jobs = {}
             for remotehost, jobs in wn_jobs.items():
@@ -595,7 +697,10 @@ def jobsPerWorkernode(**options):
                             user_jobs[remotehost] = job
                         else:
                             user_jobs[remotehost] = user_jobs[remotehost] + ',' + job
-        return user_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag, ineff_jobs
+
+            return {'jobs':user_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
+                    'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
+                    'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
 
 
 def all_wn_info(**options):
@@ -630,7 +735,7 @@ def all_wn_info(**options):
     if 'descending' in choices.keys():
          descending = choices['descending']
 
-    user= 'all'        
+    user= 'all'
     if 'user' in choices.keys():
         user = choices['user']
         list_type = 'all'
@@ -647,7 +752,19 @@ def all_wn_info(**options):
         list_type = 'workernode'
 
      # get all the jobs per worker node
-    wn_jobs, cluster_host, job_summ, jobsPerVos, held_jobs, idle_jobs, long_jobs, userflag, ineff_jobs  = jobsPerWorkernode(Collector=collector,List_Type=list_type,Username=user)
+
+    jobsPerWn = jobsPerWorkernode(Collector=collector,List_Type=list_type,Username=user)
+
+    wn_jobs = jobsPerWn['jobs']
+    cluster_host = jobsPerWn['cluster_host']
+    job_summ = jobsPerWn['job_summ']
+    jobsPerVos = jobsPerWn['jobsPerVos']
+    held_jobs = jobsPerWn['held_jobs']
+    idle_jobs = jobsPerWn['idle_jobs']
+    long_jobs = jobsPerWn['long_jobs']
+    ineff_jobs = jobsPerWn['ineff_jobs']
+    userflag = jobsPerWn['userflag']
+
      # create the header information
 
     now = datetime.datetime.now()
@@ -762,20 +879,36 @@ def all_wn_info(**options):
            else:
                wn_job =""
 
+             # table for user option
+           if  user != 'all': list_type = "user"
+           if  user != 'all':
+                 # only print worker nodes with jobs for the user
+               if wn_job:
+                   table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+
+             # table to list online worker nodes
            if wn['StartJobs'] and list_type == 'online':
                table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+
+             # table to list offline worker nodes
            if not wn['StartJobs'] and list_type == 'offline':
                table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+
+             # table to list all worker nodes
            if  list_type == 'all':
-               if wn_job:
-                   table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+               table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+
+             # table to list multicore jobs
            if  list_type == 'multicore':
+                 # only print worker nodes with multicore jobs
                if wn_job:
                    table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+
+             # table to list jobs on spefic workernodes
            if  list_type == 'workernode':
+                # only print worker nodes in the list and valid ones
                if workernode in new_wns:
-                   if wn_job:
-                       table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
+                   table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
       # get cpu summary and create pretty table
     cpu_summ = condor_cpu_summ(Collector=collector,NumberOfWorkerNodes=str(n_wns))
@@ -815,43 +948,43 @@ def all_wn_info(**options):
             html_cpu_summ, cputitle = html_table(Table=cpu_summary_table, Title=cputitle)
             html_contents = html_contents.replace('{cputitle}', cputitle)
             html_contents = html_contents.replace('{html_cpu_summ}', html_cpu_summ)
-    
+
              # condor jobs summary table
             html_job_summ, jobtitle = html_table(Table=job_queue_summ, Title=jobtitle)
             html_contents = html_contents.replace('{jobtitle}', jobtitle)
             html_contents = html_contents.replace('{html_job_summ}', html_job_summ)
-    
+
              # jobs per vos table
             html_jobsPerVos, vojobstitle = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
             html_contents = html_contents.replace('{vojobstitle}', vojobstitle)
             html_contents = html_contents.replace('{html_jobsPerVos}', html_jobsPerVos)
-    
+
              # idle jobs table
             html_idlejobs, idlejobstitle = html_table(Table=idle_jobs_summ, Title=idlejobstitle)
             html_contents = html_contents.replace('{idlejobstitle}', idlejobstitle)
             html_contents = html_contents.replace('{html_idlejobs}', html_idlejobs)
-    
+
              # held jobs table
             html_heldjobs, heldjobstitle = html_table(Table=held_jobs_summ, Title=heldjobstitle)
             html_contents = html_contents.replace('{heldjobstitle}', heldjobstitle)
             html_contents = html_contents.replace('{html_heldjobs}', html_heldjobs)
-    
+
              # long jobs table
             html_longjobs, longjobstitle = html_table(Table=long_jobs_summ, Title=longjobstitle)
             html_contents = html_contents.replace('{longjobstitle}', longjobstitle)
             html_contents = html_contents.replace('{html_longjobs}', html_longjobs)
-    
+
              # inefficient jobs table
             html_ineffjobs, ineffjobstitle = html_table(Table=ineff_jobs_summ, Title=ineffjobstitle)
             html_contents = html_contents.replace('{ineffjobstitle}', ineffjobstitle)
             html_contents = html_contents.replace('{html_ineffjobs}', html_ineffjobs)
-    
+
         if list_type != "summary":
              # resource per host table
             host_table, hostjobstitle = html_table(Table=table, Title=hostjobstitle)
             html_contents = html_contents.replace('{hostjobstitle}', hostjobstitle)
             html_contents = html_contents.replace('{host_table}', host_table)
-    
+
          # create the directory if it does not exist
         ensure_dir(html_file)
          # now create the html file
@@ -871,17 +1004,17 @@ def all_wn_info(**options):
              # number of jobs
             print jobtitle
             print job_queue_summ
-    
+
             if jobsPerVos:
                  # number of jobs per vos
                 print vojobstitle
                 print jobsPerVos_summ
-    
+
              # long jobs 
             if long_jobs:
                 print longjobstitle
                 print long_jobs_summ
-    
+
              # held jobs 
             if held_jobs:
                 print heldjobstitle
@@ -944,7 +1077,7 @@ def cpusummary_table(**options):
     summary_table = {}
     if len(summary) > 0 :
          # table header
-        header = ['WorkerNode','#CPUs','#CPUsUsed','#CPUsFree','%CPUsUsed']
+        header = ['#WorkerNodes','#CPUs','#CPUsUsed','#CPUsFree','%CPUsUsed']
         summary_table = PrettyTable(header)
          # create a border
         summary_table.border = True
@@ -1156,7 +1289,7 @@ def d_time(**options):
 
 def query_yes_no(question, default="no"):
 
-    """ yes no module """
+    """ yes/no module """
 
     valid = {"yes":True, "y":True, "ye":True, "no":False, "n":False}
 
