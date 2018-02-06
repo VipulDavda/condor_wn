@@ -25,60 +25,6 @@ Description
        condor_wn is a Linux-only tool that displays a snapshot information about jobs running
        on the HTcondor cluster. The condor_wn tool is written in python using the client-side
        APIs for HTCondor and the ClassAd language.
-Name
-       condor_wn is a command line tool to gathers information about the HTcondor
-       jobs on a cluster and displays it in a pretty format.
-
-Tested
-       Python 2.6 and 2.7
-
-Setup
-       The script should be installed in the directory /usr/local/bin directory
-       The condor_wn.yaml file should be located in the /usr/local/etc directory
-
-Synopsis
-       condor_wn  [ --list <all:offline:online:multicore> ] [ --column n ] [ --descending ]
-                  [ --summary ]
-                  [ --workernode <workernode> ]
-                  [ --user <username> ]
-                  [ --online <workernode> ]
-                  [ --offline <workernode> ]
-                  [ --html ]
-                  [ --help ]
-
-Description
-       condor_wn is a Linux-only tool that displays a snapshot information about jobs running
-       on the HTcondor cluster. The condor_wn tool is written in python using the client-side
-       APIs for HTCondor and the ClassAd language.
-Name
-       condor_wn is a command line tool to gathers information about the HTcondor
-       jobs on a cluster and displays it in a pretty format.
-
-Tested
-       Python 2.6 and 2.7
-
-Setup
-       The script should be installed in the directory /usr/local/bin directory
-       The condor_wn.yaml file should be located in the /usr/local/etc directory
-
-Synopsis
-       condor_wn  [ --list <all:offline:online:multicore> ] [ --column n ] [ --descending ]
-                  [ --summary ]
-                  [ --workernode <workernode> ]
-                  [ --user <username> ]
-                  [ --online <workernode> ]
-                  [ --offline <workernode> ]
-                  [ --html ]
-                  [ --help ]
-
-Description
-       condor_wn is a Linux-only tool that displays a snapshot information about jobs running
-       on the HTcondor cluster. The condor_wn tool is written in python using the client-side
-       APIs for HTCondor and the ClassAd language.
-       html option creates an html file of the above tables
-
-       If multiple worker nodes has to be onlined or offlined, a comma separated list can be used.
-       "ALL" input with either --online or --offline option can be used to onlined/offlined all worker nodes.
 
 Options
        --list <all:offline:online:multicore>  {same as -l}
@@ -118,6 +64,7 @@ Options
 
        --help {same as -h}
             display simple help
+            
 Additional Files
        condor_wn.yaml  Configuration files contains initial settings and html output template.
 
