@@ -1,5 +1,4 @@
 # condor_wn
-
 Name:
        condor_wn is a command line tool to gathers information about the HTcondor
        jobs on a cluster and displays it in a pretty format.
