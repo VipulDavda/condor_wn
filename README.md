@@ -1,18 +1,17 @@
 # condor_wn
-condor_wn is a command line tool to gathers information about the HTcondor jobs on a cluster and displays it in a pretty format.
 
-Name
+Name:
        condor_wn is a command line tool to gathers information about the HTcondor
        jobs on a cluster and displays it in a pretty format.
 
-Tested
+Tested:
        Python 2.6 and 2.7
 
-Setup
+Setup:
        The script should be installed in the directory /usr/local/bin directory
        The condor_wn.yaml file should be located in the /usr/local/etc directory
 
-Synopsis
+Synopsis:
        condor_wn  [ --list <all:offline:online:multicore> ] [ --column n ] [ --descending ]
                   [ --summary ]
                   [ --workernode <workernode> ]
