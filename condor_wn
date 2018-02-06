@@ -82,7 +82,8 @@ Options
             to display multiple worker nodes.
 
        --user <username> {same as -u}
-            display all jobs owned by a user running on the worker nodes.
+            display all jobs owned by a user running on the worker nodes. Comma separated list can be used
+            to display multiple users.
 
        --online <workernode> {same as -o}
             online worker node. Comma separated list can be used to online worker nodes.
@@ -308,22 +309,14 @@ def main(argv):
             print "Schedd cannot be contacted"
             sys.exit(0)
 
-    if 'online' in choices.keys():            # online a worker node
-
+    if [c for c in ['online', 'offline'] if c in choices.keys()]:
         if isCollector(Collector=collector):
-            workernode = choices['online']
-            on_off_workernode(Collector=collector, WorkerNode=workernode, Status='online')
+            if 'online' in choices.keys():
+                on_off_workernode(Collector=collector, WorkerNode=choices['online'], Status='online')
+            elif 'offline' in choices.keys():
+                on_off_workernode(Collector=collector, WorkerNode=choices['offline'], Status='offline')
         else:
-            print "Collector Deamon not running on this host"
-            sys.exit(0)
-
-    elif 'offline' in choices.keys():           # offline a worker node
-
-        if isCollector(Collector=collector):
-            workernode = choices['offline']
-            on_off_workernode(Collector=collector, WorkerNode=workernode, Status='offline')
-        else:
-            print "Collector Deamon not running on this host"
+            print "Collector Deamon not running on this server"
             sys.exit(0)
 
     return
@@ -677,30 +670,25 @@ def jobsPerWorkernode(**options):
                     else:
                         mc_jobs[remotehost] = mc_jobs[remotehost] + ',' + job
 
-        return {'jobs':mc_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
-                'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
-                'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
+        wn_jobs = mc_jobs
     else:
-        if user == 'all':
-
-            return {'jobs':wn_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
-                    'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
-                    'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
-        else:
+        if user != 'all':
             user_jobs = {}
             for remotehost, jobs in wn_jobs.items():
                 uc = jobs.split(',')
                 for job in uc:
                     u = job.split(':')[0]
-                    if u == user  :
+                    if u in user  :
                         if remotehost not in user_jobs:
                             user_jobs[remotehost] = job
                         else:
                             user_jobs[remotehost] = user_jobs[remotehost] + ',' + job
 
-            return {'jobs':user_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
-                    'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
-                    'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
+            wn_jobs = user_jobs
+
+    return {'jobs':wn_jobs, 'cluster_host':cluster_host, 'job_summ':job_summ,
+            'jobsPerVos':jobsPerVos, 'held_jobs':held_jobs, 'idle_jobs':idle_jobs,
+            'long_jobs':long_jobs, 'userflag':userflag, 'ineff_jobs':ineff_jobs}
 
 
 def all_wn_info(**options):
@@ -713,13 +701,6 @@ def all_wn_info(**options):
         collector = options.get('Collector')
     if options.get('Header'):
         header = options.get('Header')
-
-    if options.get('List_Type'):
-        list_type = options.get('List_Type')
-
-    if options.get('Username'):
-        user = options.get('Username')
-
     if options.get('Choices'):
         choices = options.get('Choices')
 
@@ -737,7 +718,7 @@ def all_wn_info(**options):
 
     user= 'all'
     if 'user' in choices.keys():
-        user = choices['user']
+        user = choices['user'].split(',')
         list_type = 'all'
 
     html = False
@@ -801,6 +782,12 @@ def all_wn_info(**options):
      # sub VO for user 
     if userflag:
         vojobstitle = vojobstitle.replace('VO', 'User')
+
+     # set _table flag to false
+    _table = False
+
+     # header for the workernode output table
+    header = ['WorkerNode', 'Status', '#CPUs', '%CPU', '%Memory', 'AverageLoad', 'LoadEfficiency', '#Jobs', 'Jobs']
 
      # table header
     table = PrettyTable(header)
@@ -884,30 +871,36 @@ def all_wn_info(**options):
            if  user != 'all':
                  # only print worker nodes with jobs for the user
                if wn_job:
+                   _table = True
                    table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
              # table to list online worker nodes
            if wn['StartJobs'] and list_type == 'online':
+               _table = True
                table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
              # table to list offline worker nodes
            if not wn['StartJobs'] and list_type == 'offline':
+               _table = True
                table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
              # table to list all worker nodes
            if  list_type == 'all':
+               _table = True
                table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
              # table to list multicore jobs
            if  list_type == 'multicore':
                  # only print worker nodes with multicore jobs
                if wn_job:
+                   _table = True
                    table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
              # table to list jobs on spefic workernodes
            if  list_type == 'workernode':
                 # only print worker nodes in the list and valid ones
                if workernode in new_wns:
+                   _table = True
                    table.add_row([workernode, status, cpuTotal, cpuPer, memoryPer, loadAvg, jobEff, njobs, wn_job])
 
       # get cpu summary and create pretty table
@@ -936,8 +929,13 @@ def all_wn_info(**options):
      # create pretty inefficient jobs table
     ineff_jobs_summ = ineff_jobs_table(Summary=ineff_jobs)
 
-     # print the pretty tables
+     #### print the pretty tables
+
     if html:
+
+        html_out = {'cputitle':"", 'html_cpu_summ':"", 'jobtitle':"", 'html_job_summ':"", 'vojobstitle':"",
+                    'html_jobsPerVos':"", 'idlejobstitle':"", 'html_idlejobs':"", 'heldjobstitle':"", 'html_heldjobs':"",
+                    'longjobstitle':"", 'html_longjobs':"", 'ineffjobstitle':"",'html_ineffjobs':""}
 
          # header information
         html_contents = html_contents.replace('{headerline}', headerline)
@@ -945,48 +943,42 @@ def all_wn_info(**options):
 
         if summary:
              # cpu summary table
-            html_cpu_summ, cputitle = html_table(Table=cpu_summary_table, Title=cputitle)
-            html_contents = html_contents.replace('{cputitle}', cputitle)
-            html_contents = html_contents.replace('{html_cpu_summ}', html_cpu_summ)
-
+            html_out['html_cpu_summ'], html_out['cputitle'] = html_table(Table=cpu_summary_table, Title=cputitle)
              # condor jobs summary table
-            html_job_summ, jobtitle = html_table(Table=job_queue_summ, Title=jobtitle)
-            html_contents = html_contents.replace('{jobtitle}', jobtitle)
-            html_contents = html_contents.replace('{html_job_summ}', html_job_summ)
-
+            html_out['html_job_summ'], html_out['jobtitle'] = html_table(Table=job_queue_summ, Title=jobtitle)
              # jobs per vos table
-            html_jobsPerVos, vojobstitle = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
-            html_contents = html_contents.replace('{vojobstitle}', vojobstitle)
-            html_contents = html_contents.replace('{html_jobsPerVos}', html_jobsPerVos)
-
+            html_out['html_jobsPerVos'], html_out['vojobstitle'] = html_table(Table=jobsPerVos_summ, Title=vojobstitle)
              # idle jobs table
-            html_idlejobs, idlejobstitle = html_table(Table=idle_jobs_summ, Title=idlejobstitle)
-            html_contents = html_contents.replace('{idlejobstitle}', idlejobstitle)
-            html_contents = html_contents.replace('{html_idlejobs}', html_idlejobs)
-
+            html_out['html_idlejobs'], html_out['idlejobstitle'] = html_table(Table=idle_jobs_summ, Title=idlejobstitle)
              # held jobs table
-            html_heldjobs, heldjobstitle = html_table(Table=held_jobs_summ, Title=heldjobstitle)
-            html_contents = html_contents.replace('{heldjobstitle}', heldjobstitle)
-            html_contents = html_contents.replace('{html_heldjobs}', html_heldjobs)
-
+            html_out['html_heldjobs'], html_out['heldjobstitle'] = html_table(Table=held_jobs_summ, Title=heldjobstitle)
              # long jobs table
-            html_longjobs, longjobstitle = html_table(Table=long_jobs_summ, Title=longjobstitle)
-            html_contents = html_contents.replace('{longjobstitle}', longjobstitle)
-            html_contents = html_contents.replace('{html_longjobs}', html_longjobs)
-
+            html_out['html_longjobs'], html_out['longjobstitle'] = html_table(Table=long_jobs_summ, Title=longjobstitle)
              # inefficient jobs table
-            html_ineffjobs, ineffjobstitle = html_table(Table=ineff_jobs_summ, Title=ineffjobstitle)
-            html_contents = html_contents.replace('{ineffjobstitle}', ineffjobstitle)
-            html_contents = html_contents.replace('{html_ineffjobs}', html_ineffjobs)
+            html_out['html_ineffjobs'], html_out['ineffjobstitle'] = html_table(Table=ineff_jobs_summ, Title=ineffjobstitle)
+
+            for k, v in html_out.items():
+                key = "{" + k + "}"
+                html_contents = html_contents.replace(key, v)
+        else:
+            for k, v in html_out.items():
+                key = "{" + k + "}"
+                html_contents = html_contents.replace(key, "")
 
         if list_type != "summary":
-             # resource per host table
-            host_table, hostjobstitle = html_table(Table=table, Title=hostjobstitle)
+            if _table:
+                 # resource per host table
+                host_table, hostjobstitle = html_table(Table=table, Title=hostjobstitle)
+            else:
+                host_table = ""
+                hostjobstitle = ""
+
             html_contents = html_contents.replace('{hostjobstitle}', hostjobstitle)
             html_contents = html_contents.replace('{host_table}', host_table)
 
          # create the directory if it does not exist
         ensure_dir(html_file)
+
          # now create the html file
         with open(html_file, "w") as f: #worker node and create a table
             f.write(html_contents)
@@ -1032,8 +1024,9 @@ def all_wn_info(**options):
 
         if list_type != "summary":
              # jobs per host
-            print hostjobstitle
-            print table
+            if _table:
+                print hostjobstitle
+                print table
 
     return
 
@@ -1346,7 +1339,6 @@ def isSchedd(**options):
         return True
     except:
         return False
-
 
 
 if __name__ == "__main__":
